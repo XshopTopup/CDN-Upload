@@ -41,3 +41,28 @@ export async function uploadBufferToGitHub({ buffer, ghPath }) {
     html_url: res.data.content.html_url
   }
 }
+
+export async function upsertTextToGitHub({ text, ghPath, message = 'update file' }) {
+  const sha = await getShaIfExists(ghPath)
+  const base64 = Buffer.from(text, 'utf8').toString('base64')
+  await okt.repos.createOrUpdateFileContents({
+    owner: OWNER,
+    repo: REPO,
+    branch: BRANCH,
+    path: ghPath,
+    message,
+    content: base64,
+    ...(sha ? { sha } : {})
+  })
+}
+
+export async function getTextFromGitHub({ ghPath }) {
+  try {
+    const { data } = await okt.repos.getContent({ owner: OWNER, repo: REPO, path: ghPath, ref: BRANCH })
+    const b64 = data.content || ''
+    return Buffer.from(b64, 'base64').toString('utf8')
+  } catch (e) {
+    if (e.status === 404) return null
+    throw e
+  }
+}
