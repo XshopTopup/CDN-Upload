@@ -1,4 +1,3 @@
-// app.js (ESM, siap Vercel, persist ke GitHub)
 import 'dotenv/config'
 import express from 'express'
 import multer from 'multer'
@@ -19,7 +18,7 @@ moment.tz.setDefault(TZ)
 const PORT = Number(process.env.PORT || 3010)
 const BASE_URL = (process.env.BASE_URL || 'https://url.arsyilla.my.id').replace(/\/+$/,'') + '/'
 
-// Tulis ke /tmp (read-write di Vercel). Simpan juga ke GitHub: maps/urls.json
+// ALWAYS use /tmp on Vercel
 const DATA_DIR = path.join('/tmp', 'data')
 const MAP_PATH = path.join(DATA_DIR, 'urls.json')
 const MAP_GH_PATH = 'maps/urls.json'
@@ -27,13 +26,8 @@ const MAP_GH_PATH = 'maps/urls.json'
 /* STATE */
 function ensureDir(p){ if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive:true }) }
 ensureDir(DATA_DIR)
-
-function readMap() {
-  try { return JSON.parse(fs.readFileSync(MAP_PATH,'utf8') || '{}') } catch { return {} }
-}
-function writeMap(obj) {
-  fs.writeFileSync(MAP_PATH, JSON.stringify(obj, null, 2))
-}
+function readMap(){ try{ return JSON.parse(fs.readFileSync(MAP_PATH,'utf8')||'{}') } catch { return {} } }
+function writeMap(obj){ fs.writeFileSync(MAP_PATH, JSON.stringify(obj,null,2)) }
 
 /* APP */
 const app = express()
@@ -44,10 +38,7 @@ app.use(express.json())
 app.use('/static', express.static(path.join(process.cwd(), 'public'), { maxAge: '7d' }))
 
 /* MULTER */
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 } // 100MB
-})
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } })
 
 /* HELPERS */
 const EXT_DIR = {
@@ -58,12 +49,7 @@ const EXT_DIR = {
   texts: ['.txt'],
   data: ['.csv','.json']
 }
-function pickDirByExt(ext){
-  for (const [dir, exts] of Object.entries(EXT_DIR)){
-    if (exts.includes(ext)) return dir
-  }
-  return 'files'
-}
+function pickDirByExt(ext){ for (const [d, xs] of Object.entries(EXT_DIR)) if (xs.includes(ext)) return d; return 'files' }
 function buildRawUrl(owner, repo, branch, filePath){
   const segs = filePath.split('/').map(encodeURIComponent).join('/')
   return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${segs}`
@@ -71,10 +57,7 @@ function buildRawUrl(owner, repo, branch, filePath){
 
 /* ROUTES */
 app.get('/', (req,res)=> res.render('index', { BASE_URL }))
-
-app.get('/docs', (req, res) => {
-  res.render('docs', { BASE_URL, TZ, PORT, EXT_DIR })
-})
+app.get('/docs', (req,res)=> res.render('docs', { BASE_URL, TZ, PORT, EXT_DIR }))
 
 app.post('/upload', upload.single('file'), async (req,res)=>{
   try {
@@ -83,15 +66,13 @@ app.post('/upload', upload.single('file'), async (req,res)=>{
     const ext = (path.extname(orig) || '').toLowerCase()
     const dir = pickDirByExt(ext)
     const slug = nanoid(10)
-    const fileName = `${moment().format('DD-MMMM-YYYY~HH:mm:ss').toLowerCase()}${ext}`
+    // gunakan HH-mm-ss, bukan HH:mm:ss (hindari ':')
+    const fileName = `${moment().format('DD-MMMM-YYYY~HH-mm-ss').toLowerCase()}${ext}`
     const ghPath = `${dir}/${fileName}`
 
-    const { owner, repo, branch, html_url } = await uploadBufferToGitHub({
-      buffer: req.file.buffer,
-      ghPath
-    })
-
+    const { owner, repo, branch, html_url } = await uploadBufferToGitHub({ buffer: req.file.buffer, ghPath })
     const rawUrl = buildRawUrl(owner, repo, branch, ghPath)
+
     const m = readMap()
     m[slug] = {
       rawUrl,
@@ -102,11 +83,9 @@ app.post('/upload', upload.single('file'), async (req,res)=>{
       createdAt: moment().toISOString()
     }
     writeMap(m)
-    // persist ke GitHub
     await upsertTextToGitHub({ text: JSON.stringify(m, null, 2), ghPath: MAP_GH_PATH, message: 'update urls.json' })
 
-    const link = BASE_URL + slug
-    res.json({ slug, link, raw: rawUrl, repo_url: html_url })
+    res.json({ slug, link: BASE_URL + slug, raw: rawUrl, repo_url: html_url })
   } catch (e){
     console.error('upload gagal:', e.status || '', e.message)
     res.status(500).json({ error: 'upload_gagal', detail: e.message })
@@ -129,20 +108,15 @@ app.get('/:slug/download', (req,res)=>{
   res.redirect(rec.rawUrl)
 })
 
-/* INIT: load urls.json dari GitHub ke /tmp saat cold start */
-async function init() {
-  try {
+/* INIT: hydrate /tmp from GitHub */
+async function init(){
+  try{
     if (!fs.existsSync(MAP_PATH)) {
       const text = await getTextFromGitHub({ ghPath: MAP_GH_PATH })
-      if (text) writeMap(JSON.parse(text))
-      else writeMap({})
+      if (text) writeMap(JSON.parse(text)); else writeMap({})
     }
-  } catch {
-    // fallback kosong
-    if (!fs.existsSync(MAP_PATH)) writeMap({})
-  }
+  }catch{ if (!fs.existsSync(MAP_PATH)) writeMap({}) }
 }
 await init()
 
-/* START */
 app.listen(PORT, ()=> console.log(`listening on ${PORT} — ${BASE_URL}`))
