@@ -1,3 +1,4 @@
+// uploader.js (ESM)
 import { Octokit } from '@octokit/rest'
 import path from 'path'
 import moment from 'moment-timezone'
@@ -9,9 +10,7 @@ const okt    = new Octokit({ auth: process.env.GH_TOKEN })
 
 async function getShaIfExists(apiPath) {
   try {
-    const { data } = await okt.repos.getContent({
-      owner: OWNER, repo: REPO, path: apiPath, ref: BRANCH
-    })
+    const { data } = await okt.repos.getContent({ owner: OWNER, repo: REPO, path: apiPath, ref: BRANCH })
     return data.sha
   } catch (e) {
     if (e.status === 404) return null
