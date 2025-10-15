@@ -1,0 +1,133 @@
+require('dotenv').config()
+const express = require('express')
+const multer = require('multer')
+const { nanoid } = require('nanoid')
+const path = require('path')
+const fs = require('fs')
+const fsp = fs.promises
+const mime = require('mime-types')
+const moment = require('moment-timezone')
+const { uploadBufferToGitHub } = require('./uploader')
+
+/* ===== CONFIG ===== */
+const TZ = 'Asia/Jakarta'
+moment.tz.setDefault(TZ)
+const PORT = Number(process.env.PORT)
+const BASE_URL = (process.env.BASE_URL).replace(/\/+$/,'') + '/'
+const DATA_DIR = path.join(__dirname, 'data')
+const MAP_PATH = path.join(DATA_DIR, 'urls.json')
+
+/* ===== STATE ===== */
+function ensureDir(p){ fs.existsSync(p) || fs.mkdirSync(p, { recursive:true }) }
+ensureDir(DATA_DIR)
+if (!fs.existsSync(MAP_PATH)) fs.writeFileSync(MAP_PATH, '{}')
+const readMap = () => JSON.parse(fs.readFileSync(MAP_PATH, 'utf8') || '{}')
+const writeMap = (obj) => fs.writeFileSync(MAP_PATH, JSON.stringify(obj, null, 2))
+
+/* ===== APP ===== */
+const app = express()
+app.set('view engine', 'ejs')
+app.set('views', path.join(__dirname, 'views'))
+app.use(express.urlencoded({ extended:true }))
+app.use(express.json())
+app.use('/static', express.static(path.join(__dirname, 'public'), { maxAge: '7d' }))
+
+/* ===== MULTER (memory) ===== */
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+})
+
+/* ===== HELPERS ===== */
+const EXT_DIR = {
+  image: ['.jpg','.jpeg','.png','.gif','.webp'],
+  videos: ['.mp4','.mov','.mkv','.webm'],
+  archives: ['.zip','.rar','.7z'],
+  docs: ['.pdf','.docx','.xlsx'],
+  texts: ['.txt'],
+  data: ['.csv','.json']
+}
+function pickDirByExt(ext){
+  for (const [dir, exts] of Object.entries(EXT_DIR)){
+    if (exts.includes(ext)) return dir
+  }
+  return 'files'
+}
+function buildRawUrl(owner, repo, branch, filePath){
+  // raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
+  const segs = filePath.split('/').map(encodeURIComponent).join('/')
+  return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${segs}`
+}
+
+/* ===== ROUTES ===== */
+app.get('/', (req,res)=>{
+  res.render('index', { BASE_URL })
+})
+
+app.get('/docs', (req, res) => {
+  res.render('docs', {
+    BASE_URL,
+    TZ,
+    PORT,
+    EXT_DIR
+  })
+})
+
+app.post('/upload', upload.single('file'), async (req,res)=>{
+  try {
+    if (!req.file) return res.status(400).send('file kosong')
+    const orig = req.file.originalname || 'file'
+    const ext = (path.extname(orig) || '').toLowerCase()
+    const dir = pickDirByExt(ext)
+    const slug = nanoid(10)
+    const fileName = `${moment().format('DD-MMMM-YYYY~HH:mm:ss').toLowerCase()}${ext}`
+    const ghPath = `${dir}/${fileName}`
+
+    const { owner, repo, branch, html_url } = await uploadBufferToGitHub({
+      buffer: req.file.buffer,
+      ghPath
+    })
+
+    const rawUrl = buildRawUrl(owner, repo, branch, ghPath)
+    const m = readMap()
+    m[slug] = {
+      rawUrl,
+      htmlUrl: html_url,
+      mime: req.file.mimetype || mime.lookup(ext) || 'application/octet-stream',
+      name: orig,
+      size: req.file.size,
+      createdAt: moment().toISOString()
+    }
+    writeMap(m)
+
+    const link = BASE_URL + slug
+    res.json({ slug, link, raw: rawUrl, repo_url: html_url })
+  } catch (e){
+    console.error('upload gagal:', e.status || '', e.message)
+    res.status(500).json({ error: 'upload_gagal', detail: e.message })
+  }
+})
+
+app.get('/:slug', async (req,res)=>{
+  const slug = req.params.slug
+  const m = readMap()
+  const rec = m[slug]
+  if (!rec) return res.status(404).send('tidak ditemukan')
+  res.setHeader('Cache-Control','public, max-age=60')
+  res.render('view', { BASE_URL, slug, rec })
+})
+
+app.get('/:slug/download', (req,res)=>{
+  const slug = req.params.slug
+  const m = readMap()
+  const rec = m[slug]
+  if (!rec) return res.status(404).send('tidak ditemukan')
+  // Arahkan ke RAW agar browser mengunduh
+  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(rec.name)}"`)
+  res.redirect(rec.rawUrl)
+})
+
+/* ===== START ===== */
+app.listen(PORT, ()=> {
+  console.log(`listening on ${PORT} — ${BASE_URL}`)
+})
