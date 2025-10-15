@@ -1,0 +1,36 @@
+<!-- views/view.ejs -->
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Detail File</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <div class="brand">Arsyilla URL</div>
+    <nav><a href="/">Beranda</a> <a href="/docs">Dokumentasi</a></nav>
+  </div>
+</header>
+
+<main class="container">
+  <section class="card">
+    <h1>Detail File</h1>
+    <div class="grid">
+      <div><b>Nama</b><br><%= rec.name %></div>
+      <div><b>MIME</b><br><%= rec.mime %></div>
+      <div><b>Ukuran</b><br><%= rec.size %> bytes</div>
+      <div><b>Dibuat</b><br><%= rec.createdAt %></div>
+    </div>
+    <p><b>RAW:</b> <a href="<%= rec.rawUrl %>" target="_blank"><%= rec.rawUrl %></a></p>
+    <a class="btn" href="/<%= slug %>/download">Download</a>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">© <%= new Date().getFullYear() %> Arsyilla</div>
+</footer>
+</body>
+</html>
