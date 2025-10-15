@@ -1,4 +1,4 @@
-// uploader.js (ESM)
+// uploader.js (ESM, unchanged except util funcs exposed)
 import { Octokit } from '@octokit/rest'
 import path from 'path'
 import moment from 'moment-timezone'
@@ -22,45 +22,26 @@ export async function uploadBufferToGitHub({ buffer, ghPath }) {
   const base64  = buffer.toString('base64')
   const sha     = await getShaIfExists(ghPath)
   const message = `upload ${path.basename(ghPath)} @ ${moment().tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss')}`
-
   const res = await okt.repos.createOrUpdateFileContents({
-    owner: OWNER,
-    repo: REPO,
-    branch: BRANCH,
-    path: ghPath,
-    message,
-    content: base64,
-    ...(sha ? { sha } : {})
+    owner: OWNER, repo: REPO, branch: BRANCH, path: ghPath,
+    message, content: base64, ...(sha ? { sha } : {})
   })
-
-  return {
-    owner: OWNER,
-    repo: REPO,
-    branch: BRANCH,
-    path: res.data.content.path,
-    html_url: res.data.content.html_url
-  }
+  return { owner: OWNER, repo: REPO, branch: BRANCH, path: res.data.content.path, html_url: res.data.content.html_url }
 }
 
-export async function upsertTextToGitHub({ text, ghPath, message = 'update file' }) {
+export async function upsertTextToGitHub({ text, ghPath, message='update file' }) {
   const sha = await getShaIfExists(ghPath)
-  const base64 = Buffer.from(text, 'utf8').toString('base64')
+  const base64 = Buffer.from(text,'utf8').toString('base64')
   await okt.repos.createOrUpdateFileContents({
-    owner: OWNER,
-    repo: REPO,
-    branch: BRANCH,
-    path: ghPath,
-    message,
-    content: base64,
-    ...(sha ? { sha } : {})
+    owner: OWNER, repo: REPO, branch: BRANCH, path: ghPath,
+    message, content: base64, ...(sha ? { sha } : {})
   })
 }
 
 export async function getTextFromGitHub({ ghPath }) {
   try {
     const { data } = await okt.repos.getContent({ owner: OWNER, repo: REPO, path: ghPath, ref: BRANCH })
-    const b64 = data.content || ''
-    return Buffer.from(b64, 'base64').toString('utf8')
+    return Buffer.from(data.content || '', 'base64').toString('utf8')
   } catch (e) {
     if (e.status === 404) return null
     throw e
