@@ -1,8 +1,9 @@
 require('dotenv').config()
-const express = require('express')
-const multer = require('multer')
-const { nanoid } = require('nanoid')
-const path = require('path')
+import express from 'express'
+import multer from 'multer'
+import { nanoid } from 'nanoid'
+import path from 'path'
+
 const fs = require('fs')
 const fsp = fs.promises
 const mime = require('mime-types')
