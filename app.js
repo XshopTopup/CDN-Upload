@@ -1,14 +1,13 @@
-require('dotenv').config()
+import 'dotenv/config'
 import express from 'express'
 import multer from 'multer'
 import { nanoid } from 'nanoid'
 import path from 'path'
-
-const fs = require('fs')
-const fsp = fs.promises
-const mime = require('mime-types')
-const moment = require('moment-timezone')
-const { uploadBufferToGitHub } = require('./uploader')
+import fs from 'fs'
+import mime from 'mime-types'
+import moment from 'moment-timezone'
+import { fileURLToPath } from 'url'
+import { uploadBufferToGitHub } from './uploader.js'
 
 /* ===== CONFIG ===== */
 const TZ = 'Asia/Jakarta'
