@@ -1,6 +1,6 @@
-const { Octokit } = require('@octokit/rest')
-const path = require('path')
-const moment = require('moment-timezone')
+import { Octokit } from '@octokit/rest'
+import path from 'path'
+import moment from 'moment-timezone'
 
 const OWNER = process.env.GH_OWNER
 const REPO = process.env.GH_REPO
