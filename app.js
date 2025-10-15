@@ -1,4 +1,4 @@
-// app.js — ESM fixed
+// app.js (ESM)
 import 'dotenv/config'
 import express from 'express'
 import multer from 'multer'
@@ -10,40 +10,39 @@ import moment from 'moment-timezone'
 import { fileURLToPath } from 'url'
 import { uploadBufferToGitHub } from './uploader.js'
 
-// __dirname untuk ESM
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-/* ===== CONFIG ===== */
+/* CONFIG */
 const TZ = 'Asia/Jakarta'
 moment.tz.setDefault(TZ)
 const PORT = Number(process.env.PORT || 3010)
 const BASE_URL = (process.env.BASE_URL || 'https://url.arsyilla.my.id').replace(/\/+$/,'') + '/'
-const DATA_DIR = path.join(__dirname, 'data')
+const DATA_DIR = path.join(process.cwd(), 'data')
 const MAP_PATH = path.join(DATA_DIR, 'urls.json')
 
-/* ===== STATE ===== */
+/* STATE */
 function ensureDir(p){ if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive:true }) }
 ensureDir(DATA_DIR)
 if (!fs.existsSync(MAP_PATH)) fs.writeFileSync(MAP_PATH, '{}')
 const readMap = () => JSON.parse(fs.readFileSync(MAP_PATH, 'utf8') || '{}')
 const writeMap = (obj) => fs.writeFileSync(MAP_PATH, JSON.stringify(obj, null, 2))
 
-/* ===== APP ===== */
+/* APP */
 const app = express()
 app.set('view engine', 'ejs')
-app.set('views', path.join(__dirname, 'views'))
+app.set('views', path.join(process.cwd(), 'views'))
 app.use(express.urlencoded({ extended:true }))
 app.use(express.json())
-app.use('/static', express.static(path.join(__dirname, 'public'), { maxAge: '7d' }))
+app.use('/static', express.static(path.join(process.cwd(), 'public'), { maxAge: '7d' }))
 
-/* ===== MULTER (memory) ===== */
+/* MULTER */
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 } // 100MB
 })
 
-/* ===== HELPERS ===== */
+/* HELPERS */
 const EXT_DIR = {
   image: ['.jpg','.jpeg','.png','.gif','.webp'],
   videos: ['.mp4','.mov','.mkv','.webm'],
@@ -63,10 +62,8 @@ function buildRawUrl(owner, repo, branch, filePath){
   return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${segs}`
 }
 
-/* ===== ROUTES ===== */
-app.get('/', (req,res)=>{
-  res.render('index', { BASE_URL })
-})
+/* ROUTES */
+app.get('/', (req,res)=> res.render('index', { BASE_URL }))
 
 app.get('/docs', (req, res) => {
   res.render('docs', { BASE_URL, TZ, PORT, EXT_DIR })
@@ -123,7 +120,5 @@ app.get('/:slug/download', (req,res)=>{
   res.redirect(rec.rawUrl)
 })
 
-/* ===== START ===== */
-app.listen(PORT, ()=> {
-  console.log(`listening on ${PORT} — ${BASE_URL}`)
-})
+/* START */
+app.listen(PORT, ()=> console.log(`listening on ${PORT} — ${BASE_URL}`))
