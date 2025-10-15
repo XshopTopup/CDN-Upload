@@ -2,25 +2,28 @@ import { Octokit } from '@octokit/rest'
 import path from 'path'
 import moment from 'moment-timezone'
 
-const OWNER = process.env.GH_OWNER
-const REPO = process.env.GH_REPO
-const BRANCH = 'main'
-const okt = new Octokit({ auth: process.env.GH_TOKEN })
+const OWNER  = process.env.GH_OWNER
+const REPO   = process.env.GH_REPO
+const BRANCH = process.env.GH_BRANCH || 'main'
+const okt    = new Octokit({ auth: process.env.GH_TOKEN })
 
-async function getShaIfExists(apiPath){
+async function getShaIfExists(apiPath) {
   try {
-    const { data } = await okt.repos.getContent({ owner: OWNER, repo: REPO, path: apiPath, ref: BRANCH })
+    const { data } = await okt.repos.getContent({
+      owner: OWNER, repo: REPO, path: apiPath, ref: BRANCH
+    })
     return data.sha
-  } catch (e){
+  } catch (e) {
     if (e.status === 404) return null
     throw e
   }
 }
 
-async function uploadBufferToGitHub({ buffer, ghPath }){
-  const base64 = buffer.toString('base64')
-  let sha = await getShaIfExists(ghPath)
+export async function uploadBufferToGitHub({ buffer, ghPath }) {
+  const base64  = buffer.toString('base64')
+  const sha     = await getShaIfExists(ghPath)
   const message = `upload ${path.basename(ghPath)} @ ${moment().tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss')}`
+
   const res = await okt.repos.createOrUpdateFileContents({
     owner: OWNER,
     repo: REPO,
@@ -30,6 +33,7 @@ async function uploadBufferToGitHub({ buffer, ghPath }){
     content: base64,
     ...(sha ? { sha } : {})
   })
+
   return {
     owner: OWNER,
     repo: REPO,
@@ -38,5 +42,3 @@ async function uploadBufferToGitHub({ buffer, ghPath }){
     html_url: res.data.content.html_url
   }
 }
-
-module.exports = { uploadBufferToGitHub }
