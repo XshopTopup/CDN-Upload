@@ -1,4 +1,4 @@
-// app.js (ESM)
+// app.js (ESM, siap Vercel, persist ke GitHub)
 import 'dotenv/config'
 import express from 'express'
 import multer from 'multer'
@@ -8,7 +8,7 @@ import fs from 'fs'
 import mime from 'mime-types'
 import moment from 'moment-timezone'
 import { fileURLToPath } from 'url'
-import { uploadBufferToGitHub } from './uploader.js'
+import { uploadBufferToGitHub, getTextFromGitHub, upsertTextToGitHub } from './uploader.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -18,15 +18,22 @@ const TZ = 'Asia/Jakarta'
 moment.tz.setDefault(TZ)
 const PORT = Number(process.env.PORT || 3010)
 const BASE_URL = (process.env.BASE_URL || 'https://url.arsyilla.my.id').replace(/\/+$/,'') + '/'
-const DATA_DIR = path.join(process.cwd(), 'data')
+
+// Tulis ke /tmp (read-write di Vercel). Simpan juga ke GitHub: maps/urls.json
+const DATA_DIR = path.join('/tmp', 'data')
 const MAP_PATH = path.join(DATA_DIR, 'urls.json')
+const MAP_GH_PATH = 'maps/urls.json'
 
 /* STATE */
 function ensureDir(p){ if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive:true }) }
 ensureDir(DATA_DIR)
-if (!fs.existsSync(MAP_PATH)) fs.writeFileSync(MAP_PATH, '{}')
-const readMap = () => JSON.parse(fs.readFileSync(MAP_PATH, 'utf8') || '{}')
-const writeMap = (obj) => fs.writeFileSync(MAP_PATH, JSON.stringify(obj, null, 2))
+
+function readMap() {
+  try { return JSON.parse(fs.readFileSync(MAP_PATH,'utf8') || '{}') } catch { return {} }
+}
+function writeMap(obj) {
+  fs.writeFileSync(MAP_PATH, JSON.stringify(obj, null, 2))
+}
 
 /* APP */
 const app = express()
@@ -95,6 +102,8 @@ app.post('/upload', upload.single('file'), async (req,res)=>{
       createdAt: moment().toISOString()
     }
     writeMap(m)
+    // persist ke GitHub
+    await upsertTextToGitHub({ text: JSON.stringify(m, null, 2), ghPath: MAP_GH_PATH, message: 'update urls.json' })
 
     const link = BASE_URL + slug
     res.json({ slug, link, raw: rawUrl, repo_url: html_url })
@@ -119,6 +128,21 @@ app.get('/:slug/download', (req,res)=>{
   res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(rec.name)}"`)
   res.redirect(rec.rawUrl)
 })
+
+/* INIT: load urls.json dari GitHub ke /tmp saat cold start */
+async function init() {
+  try {
+    if (!fs.existsSync(MAP_PATH)) {
+      const text = await getTextFromGitHub({ ghPath: MAP_GH_PATH })
+      if (text) writeMap(JSON.parse(text))
+      else writeMap({})
+    }
+  } catch {
+    // fallback kosong
+    if (!fs.existsSync(MAP_PATH)) writeMap({})
+  }
+}
+await init()
 
 /* START */
 app.listen(PORT, ()=> console.log(`listening on ${PORT} — ${BASE_URL}`))
