@@ -1,3 +1,4 @@
+// app.js — ESM fixed
 import 'dotenv/config'
 import express from 'express'
 import multer from 'multer'
@@ -9,16 +10,20 @@ import moment from 'moment-timezone'
 import { fileURLToPath } from 'url'
 import { uploadBufferToGitHub } from './uploader.js'
 
+// __dirname untuk ESM
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
 /* ===== CONFIG ===== */
 const TZ = 'Asia/Jakarta'
 moment.tz.setDefault(TZ)
-const PORT = Number(process.env.PORT)
-const BASE_URL = (process.env.BASE_URL).replace(/\/+$/,'') + '/'
+const PORT = Number(process.env.PORT || 3010)
+const BASE_URL = (process.env.BASE_URL || 'https://url.arsyilla.my.id').replace(/\/+$/,'') + '/'
 const DATA_DIR = path.join(__dirname, 'data')
 const MAP_PATH = path.join(DATA_DIR, 'urls.json')
 
 /* ===== STATE ===== */
-function ensureDir(p){ fs.existsSync(p) || fs.mkdirSync(p, { recursive:true }) }
+function ensureDir(p){ if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive:true }) }
 ensureDir(DATA_DIR)
 if (!fs.existsSync(MAP_PATH)) fs.writeFileSync(MAP_PATH, '{}')
 const readMap = () => JSON.parse(fs.readFileSync(MAP_PATH, 'utf8') || '{}')
@@ -35,7 +40,7 @@ app.use('/static', express.static(path.join(__dirname, 'public'), { maxAge: '7d'
 /* ===== MULTER (memory) ===== */
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB
 })
 
 /* ===== HELPERS ===== */
@@ -54,7 +59,6 @@ function pickDirByExt(ext){
   return 'files'
 }
 function buildRawUrl(owner, repo, branch, filePath){
-  // raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
   const segs = filePath.split('/').map(encodeURIComponent).join('/')
   return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${segs}`
 }
@@ -65,12 +69,7 @@ app.get('/', (req,res)=>{
 })
 
 app.get('/docs', (req, res) => {
-  res.render('docs', {
-    BASE_URL,
-    TZ,
-    PORT,
-    EXT_DIR
-  })
+  res.render('docs', { BASE_URL, TZ, PORT, EXT_DIR })
 })
 
 app.post('/upload', upload.single('file'), async (req,res)=>{
@@ -108,21 +107,18 @@ app.post('/upload', upload.single('file'), async (req,res)=>{
   }
 })
 
-app.get('/:slug', async (req,res)=>{
-  const slug = req.params.slug
+app.get('/:slug', (req,res)=>{
   const m = readMap()
-  const rec = m[slug]
+  const rec = m[req.params.slug]
   if (!rec) return res.status(404).send('tidak ditemukan')
   res.setHeader('Cache-Control','public, max-age=60')
-  res.render('view', { BASE_URL, slug, rec })
+  res.render('view', { BASE_URL, slug: req.params.slug, rec })
 })
 
 app.get('/:slug/download', (req,res)=>{
-  const slug = req.params.slug
   const m = readMap()
-  const rec = m[slug]
+  const rec = m[req.params.slug]
   if (!rec) return res.status(404).send('tidak ditemukan')
-  // Arahkan ke RAW agar browser mengunduh
   res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(rec.name)}"`)
   res.redirect(rec.rawUrl)
 })
