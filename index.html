@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>File Uploader</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px }
+    .container { text-align: center }
+    input[type="file"] { margin: 20px 0 }
+    button { padding: 10px 20px; background-color: #007bff; color: #fff; border: 0; border-radius: 4px; cursor: pointer }
+    button:hover { background-color: #0056b3 }
+    #message { margin-top: 20px; color: #333; word-break: break-all }
+    a { text-decoration: none }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>File Uploader to GitHub</h1>
+    <input type="file" id="fileInput" />
+    <button id="uploadBtn">Upload</button>
+    <div id="message"></div>
+  </div>
+
+  <script>
+    document.getElementById('uploadBtn').addEventListener('click', uploadFile);
+
+    async function uploadFile() {
+      const fileInput = document.getElementById('fileInput');
+      const messageDiv = document.getElementById('message');
+
+      if (!fileInput.files[0]) {
+        messageDiv.innerHTML = '<p style="color:red">Please select a file!</p>';
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      try {
+        messageDiv.innerHTML = '<p>Uploading...</p>';
+
+        const resp = await fetch('/upload', { method: 'POST', body: formData });
+        const result = await resp.json();
+
+        if (result.success) {
+          const rows = [
+            `<div><strong>Short URL:</strong> <a href="${result.url_short}" target="_blank">${result.url_short}</a></div>`,
+            `<div><strong>Short URL (full):</strong> <a href="${result.url_short_full}" target="_blank">${result.url_short_full}</a></div>`,
+            `<div><strong>RAW URL:</strong> <a href="${result.url_raw}" target="_blank">${result.url_raw}</a></div>`
+          ].join('');
+          messageDiv.innerHTML = `<p style="color:green">Upload sukses.</p>${rows}`;
+        } else {
+          messageDiv.innerHTML = `<p style="color:red">${result.error || 'Upload failed'}</p>`;
+        }
+      } catch (e) {
+        console.error(e);
+        messageDiv.innerHTML = '<p style="color:red">Error uploading file</p>';
+      }
+    }
+  </script>
+</body>
+</html>
