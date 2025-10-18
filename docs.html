@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dokumentasi</title>
+  <style>
+    :root{--bg:#0b1220;--card:#0f172a;--muted:#94a3b8;--text:#e2e8f0;--accent:#6366f1}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial;background:linear-gradient(180deg,#060b16,#0b1220);color:var(--text)}
+    .wrap{max-width:900px;margin:0 auto;padding:24px}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:18px;margin-bottom:14px}
+    code,kbd,pre{font-family:ui-monospace,Menlo,Consolas,monospace}
+    pre{background:#0b1220;border:1px solid #1f2937;border-radius:12px;padding:12px;overflow:auto}
+    a{color:#93c5fd}
+    .pill{display:inline-block;padding:2px 8px;border:1px solid #334155;border-radius:999px;color:#cbd5e1;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 style="margin:0 0 6px">Dokumentasi API</h1>
+    <p style="color:var(--muted)">Versi sederhana untuk integrasi cepat.</p>
+
+
+
+    <div class="card">
+      <h2 style="margin-top:0">POST <span class="pill">/upload</span></h2>
+      
+      <h3>Form-data</h3>
+      <ul>
+        <li><code>file</code> → <em>binary</em> (wajib)</li>
+      </ul>
+      <h3>Respons</h3>
+      <pre>{
+  "success": true,
+  "message": "File uploaded successfully",
+  "url": "https://raw.githubusercontent.com/XshopTopup/db.arsyilla/main/&lt;nama-acak.ext&gt;"
+}</pre>
+
+      <h3>Contoh</h3>
+      <p><strong>curl</strong></p>
+      <pre>curl -X POST https://url.arsyilla.my.id/upload \
+  -F "file=@/path/gambar.jpg"</pre>
+
+      <p><strong>Node.js (fetch)</strong></p>
+      <pre>import fs from "fs"
+import FormData from "form-data"
+import fetch from "node-fetch"
+
+const fd = new FormData()
+fd.append("file", fs.createReadStream("./gambar.jpg"))
+const r = await fetch("https://url.arsyilla.my.id/upload", { method: "POST", body: fd })
+console.log(await r.json())</pre>
+
+      <p><strong>Browser</strong></p>
+      <pre>const fd = new FormData()
+fd.append("file", fileInput.files[0])
+const res = await fetch("/upload", { method: "POST", body: fd })
+const json = await res.json()</pre>
+
+      <h3>Kode status</h3>
+      <ul>
+        <li><code>200</code> sukses</li>
+        <li><code>400</code> tidak ada file</li>
+        <li><code>500</code> gagal unggah</li>
+      </ul>
+    </div>
+
+
+    <p><a href="/">← Kembali ke Uploader</a></p>
+  </div>
+</body>
+</html>
